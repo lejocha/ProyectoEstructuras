@@ -89,6 +89,7 @@ puntaje_calculado = None
 # --- Variables de UI ---
 mostrar_inventario_detallado = False
 mostrar_estadisticas = False
+ordendar_inventario = False
 
 
 def mostrar_pantalla_final(ganado, puntaje_info):
@@ -178,12 +179,7 @@ def mostrar_hud_mejorado():
 
     screen.blit(font_small.render(f"Estado: {estado_resistencia}", True, color_estado), (10, 170))
 
-    # --- Mostrar inventario ---
-def mostrar_inventario_detallado_ui():
-    if not mostrar_inventario_detallado or not jugador.inventario:
-        return
-
-    #--- Mostrar estadísticas ---
+    # --- Mostrar estadísticas ---
     if mostrar_estadisticas:
         estadisticas = jugador.obtener_estadisticas()
         y = 200  # O la posición que prefieras
@@ -194,6 +190,11 @@ def mostrar_inventario_detallado_ui():
             texto_render = font_estad.render(texto, True, (0, 0, 0))
             screen.blit(texto_render, (10, y))
             y += 25
+
+    # --- Mostrar inventario ---
+def mostrar_inventario_detallado_ui():
+    if not mostrar_inventario_detallado or not jugador.inventario:
+        return
 
     # Fondo semi-transparente
     overlay = pygame.Surface((400, 300))
@@ -224,6 +225,22 @@ def mostrar_inventario_detallado_ui():
         rendered = font.render(texto, True, color)
         screen.blit(rendered, (210, y_offset + i * 20))
 
+    # Lista de pedidos ordenados por $
+    if ordendar_inventario:
+            inventario_ordenado = jugador.obtener_inventario_por_plata()
+            y_offset = 140
+    
+            for i, pedido in enumerate(inventario_ordenado[:8]):  # Mostrar máximo 8
+                color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
+    
+                texto = f"{i + 1}. Peso:{pedido.weight} Pago:${pedido.payout} Prio:{pedido.priority}"
+                tiempo_transcurrido = time.time() - getattr(pedido, 'tiempo_recogido', time.time())
+                if tiempo_transcurrido > 20:
+                    texto += " [TARDE]"
+                    color = (255, 200, 100)
+    
+                rendered = font.render(texto, True, color)
+                screen.blit(rendered, (210, y_offset + i * 20))
 
 # --- Bucle principal ---
 running = True
@@ -265,9 +282,9 @@ while running:
                 jugador, tiempo_final, duracion, meta_ingresos
             )
 
-            # Guardar puntaje (aquí puedes pedir nombre al jugador)
+            # Guardar puntaje
             sistema_persistencia.guardar_puntaje(
-                "Jugador",  # Podrías implementar input de nombre
+                "Jugador",
                 puntaje_calculado['puntaje_final'],
                 {
                     'tiempo_total': tiempo_final,
@@ -369,6 +386,9 @@ while running:
                 mostrar_inventario_detallado = not mostrar_inventario_detallado
             elif event.key == pygame.K_t:  # Mostrar/ocultar estadísticas
                 mostrar_estadisticas = not mostrar_estadisticas
+            elif event.key == pygame.K_o: #Ordenar pedidos por plata
+                ordendar_inventario = not ordendar_inventario
+
 
             # Realizar movimiento con clima
             if dx != 0 or dy != 0:
@@ -493,7 +513,7 @@ while running:
     font_controles = pygame.font.SysFont(None, 20)
     controles_texto = [
         '"Q" cancelar pedido  "U" deshacer  "I" inventario',
-        '"Ctrl+S" guardar  "I+T" estadísticas'
+        '"Ctrl+S" guardar  "T" estadísticas "I+O" orden por $'
     ]
     for i, texto in enumerate(controles_texto):
         rendered = font_controles.render(texto, True, (0, 0, 0))

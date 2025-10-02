@@ -210,20 +210,22 @@ class Jugador:
         return None
 
     def obtener_inventario_ordenado(self, criterio='prioridad'):
-        """
-        Retorna el inventario ordenado según diferentes criterios
-        criterio: 'prioridad', 'peso', 'payout', 'tiempo'
-        """
         if criterio == 'prioridad':
             return sorted(self.inventario, key=lambda p: p.priority, reverse=True)
-        elif criterio == 'peso':
-            return sorted(self.inventario, key=lambda p: p.weight)
-        elif criterio == 'payout':
-            return sorted(self.inventario, key=lambda p: p.payout, reverse=True)
-        elif criterio == 'tiempo':
-            return sorted(self.inventario, key=lambda p: getattr(p, 'tiempo_recogido', 0))
         else:
             return list(self.inventario)
+
+    def obtener_inventario_por_plata(self): #Insertion sort a los pedidos para ordenarlos por plata
+        lista = list(self.inventario)  # Se pasa de queue a lista para hacer el ordenamiento
+        for i in range(1, len(lista)):
+            actual = lista[i]
+            j = i - 1
+            while j >= 0 and lista[j].payout < actual.payout:
+                lista[j + 1] = lista[j]
+                j -= 1
+            lista[j + 1] = actual
+        self.inventario = deque(lista)  #Convierte nuevamente a queue
+        return list(self.inventario)
 
     def obtener_estadisticas(self):
         """Retorna estadísticas del jugador para mostrar en UI"""
