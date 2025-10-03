@@ -13,7 +13,7 @@ import time
 import api
 from jugador import Jugador
 from mapa import cargar_mapa, dibujar_mapa
-from pedidos import reubicar_pedidos
+from pedidos import reubicar_pedidos, asignar_posicion_aleatoria
 from clases import ColaPedidos, Pedido
 from clima import SistemaClima
 from persistencia import SistemaPersistencia, HistorialMovimientos
@@ -87,6 +87,8 @@ map_width, map_height = len(tiles[0]), len(tiles)
 ultimo_check = time.time()
 check_interval = 15
 pedidos_activos = []
+pedidos_vistos = set()  # IDs de pedidos ya procesados
+
 
 # --- Variables de liberación ---
 ultimo_liberado = 0
@@ -360,24 +362,53 @@ while running:
     if ahora - ultimo_check >= check_interval:
         try:
             resp = api.obtener_pedidos()
-            nuevos_pedidos_data = resp.get(
-                "data", []) if isinstance(resp, dict) else resp
+            nuevos_pedidos_data = resp.get("data", []) if isinstance(resp, dict) else resp
         except Exception as e:
             print("Error al obtener pedidos de la API:", e)
             nuevos_pedidos_data = []
 
         for p in nuevos_pedidos_data:
-            existe = any(
-                p["pickup"] == ped.pickup and p["dropoff"] == ped.dropoff
-                for ped in list(cola_pedidos.cola) + pedidos_activos
-            )
-            if not existe:
+            # Verificar duplicados usando el ID si existe
+            pedido_id = p.get("id", f"{p['pickup']}-{p['dropoff']}")
+
+            if pedido_id not in pedidos_vistos:
+                pedidos_vistos.add(pedido_id)
+
+                # Obtener casillas ocupadas
                 ocupadas = set()
                 for ped in pedidos_activos + list(jugador.inventario):
                     ocupadas.add(tuple(ped.pickup))
                     ocupadas.add(tuple(ped.dropoff))
                 ocupadas.add((jugador.x, jugador.y))
-                reubicar_pedidos([p], tiles, ocupadas)
+
+                # Asignar posiciones aleatorias con separación
+                pickup_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=4)
+                if pickup_pos:
+                    p["pickup"] = pickup_pos
+                    ocupadas.add(tuple(pickup_pos))
+                else:
+                    # Si no hay espacio con sep=4, intentar con sep=2
+                    pickup_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=2)
+                    if pickup_pos:
+                        p["pickup"] = pickup_pos
+                        ocupadas.add(tuple(pickup_pos))
+                    else:
+                        print(f"No se pudo asignar pickup para pedido {pedido_id}")
+                        continue
+
+                dropoff_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=4)
+                if dropoff_pos:
+                    p["dropoff"] = dropoff_pos
+                    ocupadas.add(tuple(dropoff_pos))
+                else:
+                    # Si no hay espacio con sep=4, intentar con sep=2
+                    dropoff_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=2)
+                    if dropoff_pos:
+                        p["dropoff"] = dropoff_pos
+                        ocupadas.add(tuple(dropoff_pos))
+                    else:
+                        print(f"No se pudo asignar dropoff para pedido {pedido_id}")
+                        continue
 
                 nuevo_pedido = Pedido(
                     p["pickup"], p["dropoff"],
@@ -385,8 +416,13 @@ while running:
                     p.get("priority", 0),
                     p.get("payout", 100)
                 )
+
+                # Guardar el ID
+                nuevo_pedido.id = pedido_id
+
                 cola_pedidos.agregar_pedido(nuevo_pedido)
-                break
+
+
         ultimo_check = ahora
 
     # --- Liberar pedidos ---
