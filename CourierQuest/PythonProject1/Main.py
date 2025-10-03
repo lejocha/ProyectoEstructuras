@@ -1,3 +1,13 @@
+"""
+Main.py.
+
+Aquí se maneja el juego y su interfaz, se
+configura la pantalla, carga mapas y juegos,
+crea el jugador y sus acciones con teclas,
+cargan imagenes de los elementos del juego y
+maneja el bucle del juego para que funcione.
+"""
+
 import pygame
 import time
 import api
@@ -8,13 +18,15 @@ from clases import ColaPedidos, Pedido
 from clima import SistemaClima
 from persistencia import SistemaPersistencia, HistorialMovimientos
 
+
 pygame.init()
 clock = pygame.time.Clock()
 
 # --- Configuración ---
 tile_size = 60
-view_width, view_height = 13, 13   #Tamaño original de la ventan 16,16
-screen = pygame.display.set_mode((view_width * tile_size, view_height * tile_size))
+view_width, view_height = 13, 13   # Tamaño original de la ventan 16,16.
+screen = pygame.display.set_mode((view_width * tile_size,
+                                  view_height * tile_size))
 pygame.display.set_caption("Courier Quest - Mapa")
 
 colors = {"C": (200, 200, 200), "B": (0, 0, 0), "P": (0, 200, 0)}
@@ -23,16 +35,20 @@ colors = {"C": (200, 200, 200), "B": (0, 0, 0), "P": (0, 200, 0)}
 # --- Cargar imagen del jugador ---
 player_image = pygame.image.load("assets/repartidor.png").convert_alpha()
 player_image = pygame.transform.scale(player_image, (tile_size, tile_size))
-direccionDer = True #La direccion a la que apunta el repartidor
+direccion_der = True  # La direccion a la que apunta el repartidor.
 player_imagen_flip = pygame.transform.flip(player_image, True, False)
 
 # --- Cargar imágenes de pedidos y puntos de entrega ---
 pickup_image = pygame.image.load("assets/pedido_pickup.png").convert_alpha()
 pickup_image = pygame.transform.scale(pickup_image, (tile_size, tile_size))
-dropoffNormal_image = pygame.image.load("assets/pedido_dropoff_normal.png").convert_alpha()
-dropoffNormal_image = pygame.transform.scale(dropoffNormal_image, (tile_size, tile_size))
-dropoffPrioridad_image = pygame.image.load("assets/pedido_dropoff_prioridad.png").convert_alpha()
-dropoffPrioridad_image = pygame.transform.scale(dropoffPrioridad_image, (tile_size, tile_size))
+dropoff_normal_image = pygame.image.load(
+    "assets/pedido_dropoff_normal.png").convert_alpha()
+dropoff_normal_image = pygame.transform.scale(
+    dropoff_normal_image, (tile_size, tile_size))
+dropoff_prioridad_image = pygame.image.load(
+    "assets/pedido_dropoff_prioridad.png").convert_alpha()
+dropoff_prioridad_image = pygame.transform.scale(
+    dropoff_prioridad_image, (tile_size, tile_size))
 
 # --- Cargar imágenes del ambiente ---
 calle_image = pygame.image.load("assets/Calle.jpg").convert()
@@ -43,7 +59,7 @@ edificio_image = pygame.image.load("assets/Edificio.jpg").convert()
 edificio_image = pygame.transform.scale(edificio_image, (tile_size, tile_size))
 
 
-imagenes_tiles = {  #Se guardan las imagenes
+imagenes_tiles = {  # Se guardan las imagenes
     "C": calle_image,
     "P": parque_image,
     "B": edificio_image
@@ -93,23 +109,31 @@ ordendar_inventario = False
 
 
 def mostrar_pantalla_final(ganado, puntaje_info):
-    """Muestra la pantalla final del juego"""
+    """Muestra la pantalla final del juego."""
     screen.fill((0, 0, 0))
     font_titulo = pygame.font.SysFont(None, 48)
     font_texto = pygame.font.SysFont(None, 24)
 
     if ganado:
         titulo = font_titulo.render("¡VICTORIA!", True, (0, 255, 0))
-        subtitulo = font_texto.render(f"Meta alcanzada: ${meta_ingresos}", True, (255, 255, 255))
+        subtitulo = font_texto.render(
+            f"Meta alcanzada: ${meta_ingresos}",
+            True, (255, 255, 255))
     else:
         titulo = font_titulo.render("GAME OVER", True, (255, 0, 0))
         if jugador.reputacion <= 20:
-            subtitulo = font_texto.render("Reputación muy baja", True, (255, 255, 255))
+            subtitulo = font_texto.render(
+                "Reputación muy baja", True,
+                (255, 255, 255))
         else:
-            subtitulo = font_texto.render("Tiempo agotado", True, (255, 255, 255))
+            subtitulo = font_texto.render(
+                "Tiempo agotado", True,
+                (255, 255, 255))
 
     # --- Mostrar puntaje final ---
-    puntaje_text = font_texto.render(f"Puntaje Final: {puntaje_info['puntaje_final']}", True, (255, 255, 0))
+    puntaje_text = font_texto.render(
+        f"Puntaje Final: {puntaje_info['puntaje_final']}",
+        True, (255, 255, 0))
     desglose = puntaje_info['desglose']
 
     y_offset = 150
@@ -137,12 +161,17 @@ def mostrar_pantalla_final(ganado, puntaje_info):
 
     for i, texto in enumerate(textos):
         if texto:  # No mostrar líneas vacías
-            rendered = font_texto.render(texto, True, (255, 255, 255))
-            rendered_rect = rendered.get_rect(center=(screen.get_width() // 2, y_offset + i * 25))
+            rendered = font_texto.render(
+                texto, True, (255, 255, 255))
+            rendered_rect = rendered.get_rect(
+                center=(screen.get_width() // 2, y_offset + i * 25))
             screen.blit(rendered, rendered_rect)
 
     # --- Interfaz de usuario mejorada ---
+
+
 def mostrar_hud_mejorado():
+    """Muestra la interfaz del juego."""
     font = pygame.font.SysFont(None, 24)
     font_small = pygame.font.SysFont(None, 18)
 
@@ -156,18 +185,27 @@ def mostrar_hud_mejorado():
     elif info_clima['estado'] in ['heat', 'cold']:
         clima_color = (255, 200, 100)
 
-    screen.blit(font.render(f"Clima: {clima_texto}", True, clima_color), (10, 70))
-    screen.blit(font_small.render(f"Intensidad: {info_clima['intensidad']:.1f}", True, (200, 200, 200)), (10, 95))
+    screen.blit(font.render(
+        f"Clima: {clima_texto}", True,
+        clima_color), (10, 70))
+    screen.blit(font_small.render(
+        f"Intensidad: {info_clima['intensidad']:.1f}",
+        True, (200, 200, 200)), (10, 95))
 
     # --- Meta de ingresos ---
     progreso_meta = (jugador.puntaje / meta_ingresos) * 100
-    meta_texto = f"Meta: ${jugador.puntaje}/${meta_ingresos} ({progreso_meta:.1f}%)"
+    meta_texto = (f"Meta: ${jugador.puntaje}/${meta_ingresos}"
+                  f" ({progreso_meta:.1f}%)")
     color_meta = (0, 255, 0) if progreso_meta >= 100 else (255, 255, 255)
     screen.blit(font.render(meta_texto, True, color_meta), (10, 120))
 
     # --- Inventario resumen ---
-    inventario_texto = f"Inventario: {len(jugador.inventario)}/{jugador.capacidad} (Peso: {jugador.peso_total()})"
-    screen.blit(font.render(inventario_texto, True, (255, 255, 255)), (10, 145))
+    inventario_texto = \
+        (f"Inventario: {len(jugador.inventario)}/"
+         f"{jugador.capacidad} (Peso: {jugador.peso_total()})")
+    screen.blit(font.render(
+        inventario_texto, True, (255, 255, 255)),
+        (10, 145))
 
     # --- Estado del jugador ---
     estado_resistencia = jugador.obtener_estado_resistencia()
@@ -177,7 +215,9 @@ def mostrar_hud_mejorado():
     elif estado_resistencia == "Cansado":
         color_estado = (255, 255, 0)
 
-    screen.blit(font_small.render(f"Estado: {estado_resistencia}", True, color_estado), (10, 170))
+    screen.blit(font_small.render(
+        f"Estado: {estado_resistencia}", True, color_estado),
+        (10, 170))
 
     # --- Mostrar estadísticas ---
     if mostrar_estadisticas:
@@ -185,14 +225,18 @@ def mostrar_hud_mejorado():
         y = 200  # O la posición que prefieras
         font_estad = pygame.font.SysFont(None, 22)
         for clave, valor in estadisticas.items():
-            texto = f"{clave.replace('_', ' ').capitalize()}: {valor:.2f}" if isinstance(valor,
-                                                                                         float) else f"{clave.replace('_', ' ').capitalize()}: {valor}"
+            texto = (f"{clave.replace('_', ' ').capitalize()}:"
+                     f" {valor:.2f}") if isinstance(valor, float)\
+                else f"{clave.replace('_', ' ').capitalize()}: {valor}"
             texto_render = font_estad.render(texto, True, (0, 0, 0))
             screen.blit(texto_render, (10, y))
             y += 25
 
     # --- Mostrar inventario ---
+
+
 def mostrar_inventario_detallado_ui():
+    """Muestra el inventario del jugador."""
     if not mostrar_inventario_detallado or not jugador.inventario:
         return
 
@@ -213,11 +257,15 @@ def mostrar_inventario_detallado_ui():
     inventario_ordenado = jugador.obtener_inventario_ordenado('prioridad')
     y_offset = 140
 
-    for i, pedido in enumerate(inventario_ordenado[:8]):  # Mostrar máximo 8
-        color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
+    for i, pedido in enumerate(inventario_ordenado[:8]):
+        # Mostrar máximo 8
+        color = (255, 100, 100) if (pedido.priority >=
+                                    1) else (255, 255, 255)
 
-        texto = f"{i + 1}. Peso:{pedido.weight} Pago:${pedido.payout} Prio:{pedido.priority}"
-        tiempo_transcurrido = time.time() - getattr(pedido, 'tiempo_recogido', time.time())
+        texto = (f"{i + 1}. Peso:{pedido.weight}"
+                 f" Pago:${pedido.payout} Prio:{pedido.priority}")
+        tiempo_transcurrido = time.time() - getattr(
+            pedido, 'tiempo_recogido', time.time())
         if tiempo_transcurrido > 20:
             texto += " [TARDE]"
             color = (255, 200, 100)
@@ -227,20 +275,20 @@ def mostrar_inventario_detallado_ui():
 
     # Lista de pedidos ordenados por $
     if ordendar_inventario:
-            inventario_ordenado = jugador.obtener_inventario_por_plata()
-            y_offset = 140
-    
-            for i, pedido in enumerate(inventario_ordenado[:8]):  # Mostrar máximo 8
-                color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
-    
-                texto = f"{i + 1}. Peso:{pedido.weight} Pago:${pedido.payout} Prio:{pedido.priority}"
-                tiempo_transcurrido = time.time() - getattr(pedido, 'tiempo_recogido', time.time())
-                if tiempo_transcurrido > 20:
-                    texto += " [TARDE]"
-                    color = (255, 200, 100)
-    
-                rendered = font.render(texto, True, color)
-                screen.blit(rendered, (210, y_offset + i * 20))
+        inventario_ordenado = jugador.obtener_inventario_por_plata()
+        y_offset = 140
+
+        for i, pedido in enumerate(inventario_ordenado[:8]):  # Mostrar máximo 8
+            color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
+
+            texto = f"{i + 1}. Peso:{pedido.weight} Pago:${pedido.payout} Prio:{pedido.priority}"
+            tiempo_transcurrido = time.time() - getattr(pedido, 'tiempo_recogido', time.time())
+            if tiempo_transcurrido > 20:
+                texto += " [TARDE]"
+                color = (255, 200, 100)
+
+            rendered = font.render(texto, True, color)
+            screen.blit(rendered, (210, y_offset + i * 20))
 
 # --- Bucle principal ---
 running = True
@@ -302,7 +350,9 @@ while running:
 
         # Esperar a que presione ESC para salir
         for event in pygame.event.get():
-            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            if (event.type == pygame.QUIT
+                    or (event.type == pygame.KEYDOWN
+                        and event.key == pygame.K_ESCAPE)):
                 running = False
         continue
 
@@ -310,7 +360,8 @@ while running:
     if ahora - ultimo_check >= check_interval:
         try:
             resp = api.obtener_pedidos()
-            nuevos_pedidos_data = resp.get("data", []) if isinstance(resp, dict) else resp
+            nuevos_pedidos_data = resp.get(
+                "data", []) if isinstance(resp, dict) else resp
         except Exception as e:
             print("Error al obtener pedidos de la API:", e)
             nuevos_pedidos_data = []
@@ -355,12 +406,12 @@ while running:
             # Movimiento
             if event.key == pygame.K_LEFT:
                 dx = -1
-                if direccionDer:
-                    direccionDer = False
+                if direccion_der:
+                    direccion_der = False
             elif event.key == pygame.K_RIGHT:
                 dx = 1
-                if not direccionDer:
-                    direccionDer = True
+                if not direccion_der:
+                    direccion_der = True
             elif event.key == pygame.K_UP:
                 dy = -1
             elif event.key == pygame.K_DOWN:
@@ -371,7 +422,9 @@ while running:
                 jugador.cancelar_ultimo_pedido()
             elif event.key == pygame.K_u:  # Deshacer
                 historial_movimientos.deshacer(jugador, pedidos_activos)
-            elif event.key == pygame.K_s and pygame.key.get_pressed()[pygame.K_LCTRL]:  # Ctrl+S Guardar
+            elif (event.key == pygame.K_s and
+                  pygame.key.get_pressed()[pygame.K_LCTRL]):
+                # Ctrl+S Guardar
                 estado_actual = {
                     'jugador': jugador,
                     'pedidos_activos': pedidos_activos,
@@ -382,18 +435,19 @@ while running:
                     'mapa': tiles
                 }
                 sistema_persistencia.guardar_juego(estado_actual)
-            elif event.key == pygame.K_i:  # Mostrar/ocultar inventario detallado
+            elif event.key == pygame.K_i:
+                # Mostrar/ocultar inventario detallado
                 mostrar_inventario_detallado = not mostrar_inventario_detallado
             elif event.key == pygame.K_t:  # Mostrar/ocultar estadísticas
                 mostrar_estadisticas = not mostrar_estadisticas
-            elif event.key == pygame.K_o: #Ordenar pedidos por plata
+            elif event.key == pygame.K_o:  # Ordenar pedidos por plata
                 ordendar_inventario = not ordendar_inventario
-
 
             # Realizar movimiento con clima
             if dx != 0 or dy != 0:
                 clima_mult = sistema_clima.obtener_multiplicador_actual()
-                consumo_clima = sistema_clima.obtener_consumo_resistencia_extra()
+                consumo_clima = (sistema_clima.
+                                 obtener_consumo_resistencia_extra())
                 jugador.mover(dx, dy, tiles, clima_mult, consumo_clima)
 
     # --- Revisar pickups ---
@@ -405,7 +459,8 @@ while running:
     # --- Revisar dropoffs ---
     entregado = jugador.entregar_pedido()
     if entregado:
-        print(f"Pedido entregado - Puntaje: {jugador.puntaje}, Reputación: {jugador.reputacion}")
+        print(f"Pedido entregado - Puntaje: {jugador.puntaje},"
+              f" Reputación: {jugador.reputacion}")
 
     # --- Renderizado ---
     # Cámara
@@ -414,49 +469,69 @@ while running:
 
     # Dibujar mapa y objetos
     screen.fill((255, 255, 255))
-    dibujar_mapa(screen, tiles, colors, cam_x, cam_y, tile_size, view_width, view_height, imagenes_tiles)
+    dibujar_mapa(screen, tiles, colors, cam_x, cam_y, tile_size,
+                 view_width, view_height, imagenes_tiles)
 
     # Pedidos activos (pickups)
     for pedido in pedidos_activos:
         px, py = pedido.pickup
-        if cam_x <= px < cam_x + view_width and cam_y <= py < cam_y + view_height:
-            screen.blit(pickup_image, ((px - cam_x) * tile_size, (py - cam_y) * tile_size)) #Agrega imagen
+        if (cam_x <= px < cam_x + view_width and
+                cam_y <= py < cam_y + view_height):
+            screen.blit(pickup_image,
+                        ((px - cam_x) * tile_size,
+                         (py - cam_y) * tile_size))
+            # Agrega imagen
 
         # --- Leyenda de prioridades arriba a la izquierda ---
         leyenda_size = 26
-        dropoff_prioridad_img_scaled = pygame.transform.scale(dropoffPrioridad_image, (leyenda_size, leyenda_size))
-        dropoff_normal_img_scaled = pygame.transform.scale(dropoffNormal_image, (leyenda_size, leyenda_size))
+        dropoff_prioridad_img_scaled =\
+            pygame.transform.scale(dropoff_prioridad_image,
+                                   (leyenda_size, leyenda_size))
+        dropoff_normal_img_scaled =\
+            pygame.transform.scale(dropoff_normal_image,
+                                   (leyenda_size, leyenda_size))
 
         font = pygame.font.SysFont(None, 26)
         if dropoff_prioridad_img_scaled:
             screen.blit(dropoff_prioridad_img_scaled, (5, 5))
         else:
-            pygame.draw.rect(screen, (255, 0, 0), (10, 10, 20, 20))  # Fallback
-        screen.blit(font.render("Prioridad máxima", True, (255, 255, 255)), (35, 10))
+            pygame.draw.rect(screen, (255, 0, 0), (10, 10, 20, 20))
+            # Fallback
+        screen.blit(font.render("Prioridad máxima",
+                                True, (255, 255, 255)), (35, 10))
 
         if dropoff_normal_img_scaled:
             screen.blit(dropoff_normal_img_scaled, (5, 30))
         else:
-            pygame.draw.rect(screen, (255, 105, 180), (10, 40, 20, 20))  # Fallback
-        screen.blit(font.render("Prioridad normal", True, (255, 255, 255)), (35, 40))
+            pygame.draw.rect(screen, (255, 105, 180), (10, 40, 20, 20))
+            # Fallback
+        screen.blit(font.render("Prioridad normal", True,
+                                (255, 255, 255)), (35, 40))
 
     # Dropoffs del inventario
     for pedido in jugador.inventario:
         dx, dy = pedido.dropoff
-        if cam_x <= dx < cam_x + view_width and cam_y <= dy < cam_y + view_height:
-            if pedido.priority >= 1:    #Si es prioridad maxima
-                imagen_dropoff = dropoffPrioridad_image
+        if (cam_x <= dx < cam_x + view_width and
+                cam_y <= dy < cam_y + view_height):
+            if pedido.priority >= 1:  # Si es prioridad maxima
+                imagen_dropoff = dropoff_prioridad_image
             else:
-                imagen_dropoff = dropoffNormal_image
+                imagen_dropoff = dropoff_normal_image
 
-            screen.blit(imagen_dropoff, ((dx - cam_x) * tile_size, (dy - cam_y) * tile_size))
+            screen.blit(
+                imagen_dropoff, ((dx - cam_x) *
+                                 tile_size, (dy - cam_y) * tile_size))
 
     # Jugador
     # ---Cambia la direccion del jugador ---
-    if direccionDer:
-        screen.blit(player_image, ((jugador.x - cam_x) * tile_size, (jugador.y - cam_y) * tile_size))
+    if direccion_der:
+        screen.blit(
+            player_image, ((jugador.x - cam_x) *
+                           tile_size, (jugador.y - cam_y) * tile_size))
     else:
-        screen.blit(player_imagen_flip, ((jugador.x - cam_x) * tile_size, (jugador.y - cam_y) * tile_size))
+        screen.blit(
+            player_imagen_flip, ((jugador.x - cam_x) *
+                                 tile_size, (jugador.y - cam_y) * tile_size))
 
     # UI
     mostrar_hud_mejorado()
@@ -470,22 +545,32 @@ while running:
 
     porcentaje = max(0, jugador.resistencia / jugador.max_resistencia)
     ancho_actual = int(ancho_barra * porcentaje)
-    color_barra = (0, 255, 0) if porcentaje > 0.3 else (255, 255, 0) if porcentaje > 0.1 else (255, 0, 0)
+    color_barra = (0, 255, 0) \
+        if porcentaje > 0.3 else (255, 255, 0) \
+        if porcentaje > 0.1 else (255, 0, 0)
 
-    pygame.draw.rect(screen, (100, 100, 100), (x_barra, y_barra, ancho_barra, alto_barra))
-    pygame.draw.rect(screen, color_barra, (x_barra, y_barra, ancho_actual, alto_barra))
-    screen.blit(font.render("Resistencia", True, (0, 0, 0)), (x_barra, y_barra - 20))
+    pygame.draw.rect(screen, (100, 100, 100),
+                     (x_barra, y_barra, ancho_barra, alto_barra))
+    pygame.draw.rect(screen, color_barra,
+                     (x_barra, y_barra, ancho_actual, alto_barra))
+    screen.blit(font.render(
+        "Resistencia", True, (0, 0, 0)),
+        (x_barra, y_barra - 20))
 
     # Barra de reputación
     y_barra_rep = screen.get_height() - 30
     porcentaje_rep = max(0, jugador.reputacion / 100)
     ancho_actual_rep = int(ancho_barra * porcentaje_rep)
-    color_barra_rep = (255, 0, 0) if jugador.reputacion <= 30 else (255, 255, 0) if jugador.reputacion <= 60 else (0, 0,
-                                                                                                                   255)
+    color_barra_rep = (255, 0, 0)\
+        if jugador.reputacion <= 30 else (255, 255, 0)\
+        if jugador.reputacion <= 60 else (0, 0, 255)
 
-    pygame.draw.rect(screen, (100, 100, 100), (x_barra, y_barra_rep, ancho_barra, alto_barra))
-    pygame.draw.rect(screen, color_barra_rep, (x_barra, y_barra_rep, ancho_actual_rep, alto_barra))
-    screen.blit(font.render("Reputación", True, (0, 0, 0)), (x_barra, y_barra_rep - 20))
+    pygame.draw.rect(screen, (100, 100, 100),
+                     (x_barra, y_barra_rep, ancho_barra, alto_barra))
+    pygame.draw.rect(screen, color_barra_rep,
+                     (x_barra, y_barra_rep, ancho_actual_rep, alto_barra))
+    screen.blit(font.render("Reputación", True,
+                            (0, 0, 0)), (x_barra, y_barra_rep - 20))
 
     # Cronómetro
     tiempo_restante = max(0, int(duracion - tiempo_transcurrido))
@@ -500,13 +585,15 @@ while running:
     # Mostrar mensajes temporales
     if jugador.mensaje and time.time() - jugador.mensaje_tiempo < 3:
         font_msg = pygame.font.SysFont(None, 28)
-        aviso = font_msg.render(jugador.mensaje, True, (0, 0, 0))
+        aviso = font_msg.render(
+            jugador.mensaje, True, (0, 0, 0))
         screen.blit(aviso, (10, screen.get_height() - 130))
 
     # Mensaje de energía
     if jugador.bloqueado:
         font_msg = pygame.font.SysFont(None, 36)
-        aviso = font_msg.render("¡Sin energía! Descansando...", True, (255, 0, 0))
+        aviso = font_msg.render(
+            "¡Sin energía! Descansando...", True, (255, 0, 0))
         screen.blit(aviso, (10, screen.get_height() - 110))
 
     # --- Controles ---
@@ -518,7 +605,8 @@ while running:
     for i, texto in enumerate(controles_texto):
         rendered = font_controles.render(texto, True, (0, 0, 0))
         rect = rendered.get_rect()
-        rect.bottomright = (screen.get_width() - 10, screen.get_height() - 30 + i * 20)
+        rect.bottomright = (screen.get_width() -
+                            10, screen.get_height() - 30 + i * 20)
         screen.blit(rendered, rect)
 
     # Overlays opcionales

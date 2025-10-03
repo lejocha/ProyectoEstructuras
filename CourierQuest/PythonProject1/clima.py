@@ -1,10 +1,31 @@
+"""
+clima.py.
+
+Aquí se maneja el sistema de clima del juego
+con ayuda de la API, también maneja
+los efectos del clima sobre el jugador.
+"""
+
 import random
 import time
 import json
 
 
 class SistemaClima:
+    """Crea el sistema de clima.
+
+    Administra condiciones climáticas,
+    las toma desde la API y hace que
+    cambien automáticamente, también
+    aplica los efectos del clima al jugador.
+    """
+
     def __init__(self, api_module=None):
+        """Construye el sistema.
+
+        Carga la configuración del clima de la API y
+        configura que siempre inicie con "clear".
+        """
         self.api = api_module
 
         # Multiplicadores de velocidad para cada clima
@@ -38,7 +59,9 @@ class SistemaClima:
         self.matriz_transicion = {}
         self.estado_actual = 'clear'
         self.intensidad_actual = 0.0
-        self.tiempo_cambio = time.time() + random.randint(45, 90)  # 45-90 segundos
+        self.tiempo_cambio = (
+                time.time() + random.randint(45, 90))
+        # 45-90 segundos
 
         # Variables de transición suave
         self.en_transicion = False
@@ -50,7 +73,8 @@ class SistemaClima:
         # Cargar configuración del clima desde API
         self.cargar_configuracion_clima()
 
-    def cargar_configuracion_clima(self):   #Carga la configuración del clima desde la API o archivo local
+    def cargar_configuracion_clima(self):
+        """Carga la configuración del clima de la API o archivo local."""
         try:
             if self.api:
                 clima_data = self.api.obtener_clima()
@@ -64,23 +88,27 @@ class SistemaClima:
                 data = clima_data["data"]
 
                 # Estados disponibles
-                self.estados_disponibles = data.get("conditions", list(self.multiplicadores.keys()))
+                self.estados_disponibles =\
+                    data.get("conditions", list(self.multiplicadores.keys()))
 
                 # Configuración inicial
-                initial = data.get("initial", {"condition": "clear", "intensity": 0.0})
+                initial = data.get(
+                    "initial", {"condition": "clear", "intensity": 0.0})
                 self.estado_actual = initial.get("condition", "clear")
                 self.intensidad_actual = initial.get("intensity", 0.0)
 
                 # Matriz de transición desde la API
                 transition_data = data.get("transition", {})
-                self.matriz_transicion = self._procesar_matriz_transicion(transition_data)
+                self.matriz_transicion =\
+                    self._procesar_matriz_transicion(transition_data)
 
-                print(f"Configuración del clima cargada desde API")
+                print("Configuración del clima cargada desde API")
                 print(f"Estado inicial: {self.estado_actual}")
                 print(f"Estados disponibles: {len(self.estados_disponibles)}")
 
             else:
-                print("Formato de API inesperado, usando configuración por defecto")
+                print("Formato de API inesperado,"
+                      " usando configuración por defecto")
                 self._usar_configuracion_por_defecto()
 
         except Exception as e:
@@ -88,17 +116,19 @@ class SistemaClima:
             self._usar_configuracion_por_defecto()
 
     def _procesar_matriz_transicion(self, transition_data):
-        """
-        Convierte la matriz de transición del formato API al formato interno
+        """Convierte la matriz de transición.
 
-        API format: {"clear": {"clear": 0.6, "clouds": 0.3, "rain": 0.1}, ...}
-        Internal format: {"clear": ["clear", "clouds", "rain"], weights: [0.6, 0.3, 0.1]}
+         Lo hace del formato API al formato interno.
+
+        API format: {"clear": {"clear": 0.6, "clouds": 0.3, "rain": 0.1}, ...}.
+        Internal format: {"clear": ["clear", "clouds", "rain"],
+        weights: [0.6, 0.3, 0.1]}.
         """
         matriz_procesada = {}
 
         for estado_origen, transiciones in transition_data.items():
             if estado_origen in self.estados_disponibles:
-                # Extraer estados destino y sus probabilidades
+                # Extraer estados destino y sus probabilidades.
                 estados_destino = []
                 probabilidades = []
 
@@ -107,7 +137,7 @@ class SistemaClima:
                         estados_destino.append(estado_destino)
                         probabilidades.append(prob)
 
-                # Normalizar probabilidades para asegurar que sumen 1.0
+                # Normalizar probabilidades para asegurar que sumen 1.0.
                 suma_prob = sum(probabilidades)
                 if suma_prob > 0:
                     probabilidades = [p / suma_prob for p in probabilidades]
@@ -119,32 +149,49 @@ class SistemaClima:
 
         return matriz_procesada
 
-    def _usar_configuracion_por_defecto(self): #si la API falla
-        self.estados_disponibles = ['clear', 'clouds', 'rain_light', 'rain', 'storm', 'fog', 'wind', 'heat', 'cold']
+    def _usar_configuracion_por_defecto(self):
+        """Hace que se use un clima por defecto si el API falla."""
+        self.estados_disponibles =\
+            ['clear', 'clouds', 'rain_light', 'rain', 'storm',
+             'fog', 'wind', 'heat', 'cold']
         self.estado_actual = 'clear'
         self.intensidad_actual = 0.5
 
-        self.matriz_transicion = {  #Traduce los climas
-            'clear': {'estados': ['clear', 'clouds', 'wind'], 'probabilidades': [0.5, 0.3, 0.2]},
-            'clouds': {'estados': ['clear', 'clouds', 'rain_light'], 'probabilidades': [0.3, 0.4, 0.3]},
-            'rain_light': {'estados': ['clouds', 'rain_light', 'rain'], 'probabilidades': [0.4, 0.4, 0.2]},
-            'rain': {'estados': ['clouds', 'rain', 'storm'], 'probabilidades': [0.4, 0.4, 0.2]},
-            'storm': {'estados': ['rain', 'clouds', 'storm'], 'probabilidades': [0.5, 0.3, 0.2]},
-            'fog': {'estados': ['fog', 'clouds', 'clear'], 'probabilidades': [0.5, 0.3, 0.2]},
-            'wind': {'estados': ['wind', 'clouds', 'clear'], 'probabilidades': [0.5, 0.3, 0.2]},
-            'heat': {'estados': ['heat', 'clear', 'clouds'], 'probabilidades': [0.5, 0.3, 0.2]},
-            'cold': {'estados': ['cold', 'clear', 'clouds'], 'probabilidades': [0.5, 0.3, 0.2]}
+        self.matriz_transicion = {  # Traduce los climas.
+            'clear': {'estados': ['clear', 'clouds', 'wind'],
+                      'probabilidades': [0.5, 0.3, 0.2]},
+            'clouds': {'estados': ['clear', 'clouds', 'rain_light'],
+                       'probabilidades': [0.3, 0.4, 0.3]},
+            'rain_light': {'estados': ['clouds', 'rain_light', 'rain'],
+                           'probabilidades': [0.4, 0.4, 0.2]},
+            'rain': {'estados': ['clouds', 'rain', 'storm'],
+                     'probabilidades': [0.4, 0.4, 0.2]},
+            'storm': {'estados': ['rain', 'clouds', 'storm'],
+                      'probabilidades': [0.5, 0.3, 0.2]},
+            'fog': {'estados': ['fog', 'clouds', 'clear'],
+                    'probabilidades': [0.5, 0.3, 0.2]},
+            'wind': {'estados': ['wind', 'clouds', 'clear'],
+                     'probabilidades': [0.5, 0.3, 0.2]},
+            'heat': {'estados': ['heat', 'clear', 'clouds'],
+                     'probabilidades': [0.5, 0.3, 0.2]},
+            'cold': {'estados': ['cold', 'clear', 'clouds'],
+                     'probabilidades': [0.5, 0.3, 0.2]}
         }
 
         print("Usando configuración de clima por defecto")
 
-    def obtener_multiplicador_actual(self): #Retorna el multiplicador de velocidad actual (con transición suave)
+    def obtener_multiplicador_actual(self):
+        """Retorna el multiplicador de velocidad.
+
+        Retorna el actual (con transición suave).
+        """
         if not self.en_transicion:
             base_mult = self.multiplicadores.get(self.estado_actual, 1.0)
-            # Aplicar intensidad: a mayor intensidad, mayor efecto
-            return base_mult * (1.0 - 0.5 * self.intensidad_actual * (1.0 - base_mult))
+            # Aplicar intensidad: a mayor intensidad, mayor efecto.
+            return base_mult * (
+                    1.0 - 0.5 * self.intensidad_actual * (1.0 - base_mult))
 
-        # Durante transición, interpolar entre estados
+        # Durante transición, interpolar entre estados.
         tiempo_transcurrido = time.time() - self.tiempo_inicio_transicion
         progreso = min(1.0, tiempo_transcurrido / self.duracion_transicion)
 
@@ -152,53 +199,61 @@ class SistemaClima:
         mult_nuevo = self.multiplicadores.get(self.estado_actual, 1.0)
         mult_nuevo *= (1.0 - 0.5 * self.intensidad_actual * (1.0 - mult_nuevo))
 
-        # Interpolación linear
+        # Interpolación linear.
         multiplicador = mult_anterior + (mult_nuevo - mult_anterior) * progreso
 
-        # Finalizar transición
+        # Finalizar transición.
         if progreso >= 1.0:
             self.en_transicion = False
 
         return multiplicador
 
-    def obtener_consumo_resistencia_extra(self):    #Retorna el consumo extra de resistencia por el clima actual
+    def obtener_consumo_resistencia_extra(self):
+        """Retorna el consumo extra de resistencia por el clima actual."""
         consumo_base = self.consumo_resistencia.get(self.estado_actual, 0.0)
 
         if not self.en_transicion:
             return consumo_base * (1.0 + self.intensidad_actual)
 
-        # Durante transición, interpolar
+        # Durante transición, interpolar.
         tiempo_transcurrido = time.time() - self.tiempo_inicio_transicion
         progreso = min(1.0, tiempo_transcurrido / self.duracion_transicion)
 
-        consumo_anterior = self.consumo_resistencia.get(self.estado_anterior, 0.0)
+        consumo_anterior = self.consumo_resistencia.get(
+            self.estado_anterior, 0.0)
         consumo_nuevo = consumo_base * (1.0 + self.intensidad_actual)
 
         return consumo_anterior + (consumo_nuevo - consumo_anterior) * progreso
 
-    def actualizar(self): #Actualiza el estado del clima según el tiempo y la cadena de Markov
+    def actualizar(self):
+        """Actualiza el estado del clima.
+
+        Lo actualiza según el tiempo y la cadena de Markov.
+        """
         ahora = time.time()
 
-        # Verificar si es hora de cambiar el clima
+        # Verificar si es hora de cambiar el clima.
         if ahora >= self.tiempo_cambio:
             self._cambiar_clima()
 
-    def _cambiar_clima(self):   #Cambia el clima usando la matriz de Markov cargada desde la API
+    def _cambiar_clima(self):
+        """Cambia el clima usando la matriz de Markov cargada desde la API."""
         if self.estado_actual not in self.matriz_transicion:
-            print(f"Estado {self.estado_actual} no encontrado en matriz, usando aleatorio")
+            print(f"Estado {self.estado_actual} no encontrado en matriz,"
+                  f" usando aleatorio")
             nuevo_estado = random.choice(self.estados_disponibles)
         else:
             transicion = self.matriz_transicion[self.estado_actual]
             estados = transicion['estados']
             probabilidades = transicion['probabilidades']
 
-            # Seleccionar siguiente estado basado en probabilidades
+            # Seleccionar siguiente estado basado en probabilidades.
             nuevo_estado = random.choices(estados, weights=probabilidades)[0]
 
-        # Generar nueva intensidad (0.0 a 1.0)
+        # Generar nueva intensidad (0.0 a 1.0).
         nueva_intensidad = random.uniform(0.2, 1.0)
 
-        # Iniciar transición suave
+        # Iniciar transición suave.
         self.estado_anterior = self.estado_actual
         self.estado_actual = nuevo_estado
         self.intensidad_actual = nueva_intensidad
@@ -206,12 +261,14 @@ class SistemaClima:
         self.en_transicion = True
         self.tiempo_inicio_transicion = time.time()
 
-        # Programar próximo cambio (45-90 segundos según especificación)
+        # Programar próximo cambio (45-90 segundos según especificación).
         self.tiempo_cambio = time.time() + random.randint(45, 90)
 
-        print(f"Clima: {self.estado_anterior} → {self.estado_actual} (intensidad: {self.intensidad_actual:.2f})")
+        print(f"Clima: {self.estado_anterior} → {self.estado_actual}"
+              f" (intensidad: {self.intensidad_actual:.2f})")
 
-    def obtener_info_clima(self):   #Retorna información del clima para mostrar en pantalla
+    def obtener_info_clima(self):
+        """Retorna información del clima para mostrar en pantalla."""
         return {
             'estado': self.estado_actual,
             'intensidad': self.intensidad_actual,
@@ -221,7 +278,8 @@ class SistemaClima:
             'consumo_extra': self.obtener_consumo_resistencia_extra()
         }
 
-    def traducir_clima(self, estado):   #Traduce los climas para mostrarlos al jugador
+    def traducir_clima(self, estado):
+        """Traduce los climas para mostrarlos al jugador."""
         traducciones = {
             'clear': 'Despejado ',
             'clouds': 'Nublado ',
@@ -235,7 +293,8 @@ class SistemaClima:
         }
         return traducciones.get(estado, f"{estado} ")
 
-    def obtener_efecto_descripcion(self):   #Retorna descripción del efecto actual del clima
+    def obtener_efecto_descripcion(self):
+        """Retorna descripción del efecto actual del clima."""
         mult = self.obtener_multiplicador_actual()
         consumo = self.obtener_consumo_resistencia_extra()
 
@@ -248,11 +307,14 @@ class SistemaClima:
         else:
             return "Condiciones extremas"
 
-    def debug_info(self):   #Información de debug sobre el sistema de clima
+    def debug_info(self):
+        """Información de debug sobre el sistema de clima."""
         return {
             'estados_disponibles': self.estados_disponibles,
             'matriz_size': len(self.matriz_transicion),
             'estado_actual': self.estado_actual,
-            'transiciones_disponibles': list(self.matriz_transicion.get(self.estado_actual, {}).get('estados', [])),
+            'transiciones_disponibles':
+                list(self.matriz_transicion.get(self.estado_actual, {})
+                     .get('estados', [])),
             'api_conectada': self.api is not None
         }
