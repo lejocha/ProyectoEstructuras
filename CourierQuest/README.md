@@ -4,11 +4,11 @@ Juego: Courier Quest
 
 Integrantes: 
 
-- Justin Briones S.
+- Justin Briones Sequeira
 
-- Emmanuel Rodriguez P.
+- Emmanuel Rodriguez Picado
 
-- Josué Vargas G.
+- Josué Vargas Gutiérrez
 
 -Instrucciones de uso-
 -
