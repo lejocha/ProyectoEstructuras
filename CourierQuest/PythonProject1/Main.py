@@ -1,17 +1,9 @@
-"""
-Main.py.
-
-Aquí se maneja el juego y su interfaz, se
-configura la pantalla, carga mapas y juegos,
-crea el jugador y sus acciones con teclas,
-cargan imagenes de los elementos del juego y
-maneja el bucle del juego para que funcione.
-"""
 
 import pygame
 import time
 import api
 from jugador import Jugador
+from jugadorCPU import JugadorCPU
 from mapa import cargar_mapa, dibujar_mapa
 from pedidos import reubicar_pedidos, asignar_posicion_aleatoria
 from clases import ColaPedidos, Pedido
@@ -24,21 +16,32 @@ clock = pygame.time.Clock()
 
 # --- Configuración ---
 tile_size = 60
-view_width, view_height = 13, 13   # Tamaño original de la ventan 16,16.
+view_width, view_height = 13, 13
 screen = pygame.display.set_mode((view_width * tile_size,
                                   view_height * tile_size))
-pygame.display.set_caption("Courier Quest - Mapa")
+pygame.display.set_caption("Courier Quest - Modo CPU")
 
 colors = {"C": (200, 200, 200), "B": (0, 0, 0), "P": (0, 200, 0)}
 
-
-# --- Cargar imagen del jugador ---
+# --- Cargar imágenes del jugador humano ---
 player_image = pygame.image.load("assets/repartidor.png").convert_alpha()
 player_image = pygame.transform.scale(player_image, (tile_size, tile_size))
-direccion_der = True  # La direccion a la que apunta el repartidor.
 player_imagen_flip = pygame.transform.flip(player_image, True, False)
+direccion_der = True
 
-# --- Cargar imágenes de pedidos y puntos de entrega ---
+# --- Cargar imágenes del CPU ---
+cpu_image = pygame.image.load("assets/repartidor.png").convert_alpha()
+# Colorear de manera diferente (rojo para CPU)
+cpu_image = pygame.transform.scale(cpu_image, (tile_size, tile_size))
+# Aplicar tinte rojo al CPU
+cpu_image_colored = cpu_image.copy()
+# Crear superficie roja semi-transparente
+red_tint = pygame.Surface((tile_size, tile_size))
+red_tint.fill((255, 50, 50))
+red_tint.set_alpha(100)
+cpu_image_colored.blit(red_tint, (0, 0), special_flags=pygame.BLEND_ADD)
+
+# --- Cargar imágenes de pedidos ---
 pickup_image = pygame.image.load("assets/pedido_pickup.png").convert_alpha()
 pickup_image = pygame.transform.scale(pickup_image, (tile_size, tile_size))
 dropoff_normal_image = pygame.image.load(
@@ -58,8 +61,7 @@ parque_image = pygame.transform.scale(parque_image, (tile_size, tile_size))
 edificio_image = pygame.image.load("assets/Edificio.jpg").convert()
 edificio_image = pygame.transform.scale(edificio_image, (tile_size, tile_size))
 
-
-imagenes_tiles = {  # Se guardan las imagenes
+imagenes_tiles = {
     "C": calle_image,
     "P": parque_image,
     "B": edificio_image
@@ -70,115 +72,198 @@ sistema_clima = SistemaClima(api)
 sistema_persistencia = SistemaPersistencia()
 historial_movimientos = HistorialMovimientos()
 
-# --- Cargar mapa y pedidos iniciales ---
+# --- Cargar mapa y pedidos ---
 tiles = cargar_mapa(api)
 mapa_data = api.obtener_mapa()["data"]
-meta_ingresos = 5500  # Meta de ingresos del mapa
+meta_ingresos = 5500
 
 pedidos_data = api.obtener_pedidos()["data"]
 reubicar_pedidos(pedidos_data, tiles)
 cola_pedidos = ColaPedidos(pedidos_data)
 
-# --- Crear jugador ---
+# --- Crear jugadores ---
 jugador = Jugador(0, 0)
 map_width, map_height = len(tiles[0]), len(tiles)
+
+# Menú de selección de dificultad
+def seleccionar_dificultad():
+    """Muestra menú para seleccionar dificultad del CPU."""
+    font_titulo = pygame.font.SysFont(None, 48)
+    font_opcion = pygame.font.SysFont(None, 32)
+
+    seleccionando = True
+    dificultad_seleccionada = None
+
+    while seleccionando:
+        screen.fill((30, 30, 50))
+
+        # Título
+        titulo = font_titulo.render(
+            "Selecciona Dificultad CPU", True, (255, 255, 255))
+        titulo_rect = titulo.get_rect(
+            center=(screen.get_width() // 2, 100))
+        screen.blit(titulo, titulo_rect)
+
+        # Opciones
+        opciones = [
+            ("1 - FÁCIL (Aleatorio)", 'facil', 200),
+            ("2 - MEDIO (Greedy)", 'medio', 270),
+            ("3 - DIFÍCIL (A*)", 'dificil', 340),
+            ("", None, 410),
+            ("ESC - Sin CPU", None, 480)
+        ]
+
+        for texto, dif, y_pos in opciones:
+            if texto:
+                color = (100, 255, 100) if dif else (200, 200, 200)
+                opcion = font_opcion.render(texto, True, color)
+                opcion_rect = opcion.get_rect(
+                    center=(screen.get_width() // 2, y_pos))
+                screen.blit(opcion, opcion_rect)
+
+        # Descripción de dificultades
+        descripciones = [
+            "Fácil: El CPU se mueve aleatoriamente",
+            "Medio: Evalúa movimientos con heurísticas",
+            "Difícil: Usa algoritmos de ruta óptima"
+        ]
+
+        font_small = pygame.font.SysFont(None, 20)
+        for i, desc in enumerate(descripciones):
+            texto = font_small.render(desc, True, (180, 180, 180))
+            screen.blit(texto, (50, 550 + i * 25))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    dificultad_seleccionada = 'facil'
+                    seleccionando = False
+                elif event.key == pygame.K_2:
+                    dificultad_seleccionada = 'medio'
+                    seleccionando = False
+                elif event.key == pygame.K_3:
+                    dificultad_seleccionada = 'dificil'
+                    seleccionando = False
+                elif event.key == pygame.K_ESCAPE:
+                    dificultad_seleccionada = None
+                    seleccionando = False
+
+    return dificultad_seleccionada
+
+# Seleccionar dificultad
+dificultad_cpu = seleccionar_dificultad()
+
+if dificultad_cpu is None:
+    print("Jugando sin CPU")
+    jugador_cpu = None
+else:
+    # Crear CPU en posición opuesta del mapa
+    cpu_x = map_width - 1
+    cpu_y = map_height - 1
+    # Asegurar que no sea edificio
+    while tiles[cpu_y][cpu_x] == 'B':
+        cpu_x -= 1
+        if cpu_x < 0:
+            cpu_x = map_width - 1
+            cpu_y -= 1
+
+    jugador_cpu = JugadorCPU(cpu_x, cpu_y, dificultad=dificultad_cpu)
+    print(f"CPU creado con dificultad: {dificultad_cpu}")
 
 # --- Variables de control ---
 ultimo_check = time.time()
 check_interval = 15
 pedidos_activos = []
-pedidos_vistos = set()  # IDs de pedidos ya procesados
+pedidos_vistos = set()
 ultimo_limpieza_vistos = time.time()
 intervalo_limpieza = 20
 
-# --- Variables de liberación ---
 ultimo_liberado = 0
 liberar_interval = 5
 
-# --- Tiempo de juego ---
 tiempo_inicio = time.time()
-duracion = 10 * 60  # 10 minutos
+duracion = 10 * 60
 
-# --- Variables de estado del juego ---
 juego_terminado = False
-juego_ganado = False
-mostrar_puntajes = False
-puntaje_calculado = None
+ganador = None
+puntaje_calculado_humano = None
+puntaje_calculado_cpu = None
 
-# --- Variables de UI ---
 mostrar_inventario_detallado = False
 mostrar_estadisticas = False
 ordendar_inventario = False
 
 
-def mostrar_pantalla_final(ganado, puntaje_info):
-    """Muestra la pantalla final del juego."""
+def mostrar_pantalla_final(ganador_final, puntaje_humano, puntaje_cpu_info):
+    """Muestra pantalla final con resultados de ambos jugadores."""
     screen.fill((0, 0, 0))
     font_titulo = pygame.font.SysFont(None, 48)
     font_texto = pygame.font.SysFont(None, 24)
 
-    if ganado:
-        titulo = font_titulo.render("¡VICTORIA!", True, (0, 255, 0))
-        subtitulo = font_texto.render(
-            f"Meta alcanzada: ${meta_ingresos}",
-            True, (255, 255, 255))
+    if ganador_final == 'humano':
+        titulo = font_titulo.render("¡VICTORIA HUMANO!", True, (0, 255, 0))
+    elif ganador_final == 'cpu':
+        titulo = font_titulo.render("¡VICTORIA CPU!", True, (255, 100, 100))
     else:
-        titulo = font_titulo.render("GAME OVER", True, (255, 0, 0))
-        if jugador.reputacion <= 20:
-            subtitulo = font_texto.render(
-                "Reputación muy baja", True,
-                (255, 255, 255))
-        else:
-            subtitulo = font_texto.render(
-                "Tiempo agotado", True,
-                (255, 255, 255))
+        titulo = font_titulo.render("JUEGO TERMINADO", True, (255, 255, 0))
 
-    # --- Mostrar puntaje final ---
-    puntaje_text = font_texto.render(
-        f"Puntaje Final: {puntaje_info['puntaje_final']}",
-        True, (255, 255, 0))
-    desglose = puntaje_info['desglose']
+    titulo_rect = titulo.get_rect(center=(screen.get_width() // 2, 50))
+    screen.blit(titulo, titulo_rect)
 
-    y_offset = 150
-    textos = [
-        f"Puntaje Base: {desglose['base']}",
-        f"Bonus Tiempo: +{desglose['bonus_tiempo']}",
-        f"Bonus Meta: +{desglose['bonus_meta']}",
-        f"Penalizaciones: -{desglose['penalizaciones']}",
-        "",
+    # Resultados del jugador humano
+    y_offset = 120
+    textos_humano = [
+        f"=== JUGADOR HUMANO ===",
+        f"Puntaje: {puntaje_humano['puntaje_final']}",
         f"Entregas: {jugador.entregas_completadas}",
-        f"Reputación Final: {jugador.reputacion}",
-        f"Dinero Ganado: ${jugador.puntaje}",
-        "",
-        "Presiona ESC para continuar..."
+        f"Dinero: ${jugador.puntaje}",
+        f"Reputación: {jugador.reputacion}",
+        ""
     ]
 
-    # --- Centrar y mostrar textos ---
-    titulo_rect = titulo.get_rect(center=(screen.get_width() // 2, 50))
-    subtitulo_rect = subtitulo.get_rect(center=(screen.get_width() // 2, 90))
-    puntaje_rect = puntaje_text.get_rect(center=(screen.get_width() // 2, 120))
+    for texto in textos_humano:
+        rendered = font_texto.render(texto, True, (100, 255, 100))
+        rendered_rect = rendered.get_rect(
+            center=(screen.get_width() // 2, y_offset))
+        screen.blit(rendered, rendered_rect)
+        y_offset += 30
 
-    screen.blit(titulo, titulo_rect)
-    screen.blit(subtitulo, subtitulo_rect)
-    screen.blit(puntaje_text, puntaje_rect)
+    # Resultados del CPU (si existe)
+    if jugador_cpu and puntaje_cpu_info:
+        textos_cpu = [
+            f"=== JUGADOR CPU ({jugador_cpu.dificultad.upper()}) ===",
+            f"Puntaje: {puntaje_cpu_info['puntaje_final']}",
+            f"Entregas: {jugador_cpu.entregas_completadas}",
+            f"Dinero: ${jugador_cpu.puntaje}",
+            f"Reputación: {jugador_cpu.reputacion}",
+            ""
+        ]
 
-    for i, texto in enumerate(textos):
-        if texto:  # No mostrar líneas vacías
-            rendered = font_texto.render(
-                texto, True, (255, 255, 255))
+        for texto in textos_cpu:
+            rendered = font_texto.render(texto, True, (255, 100, 100))
             rendered_rect = rendered.get_rect(
-                center=(screen.get_width() // 2, y_offset + i * 25))
+                center=(screen.get_width() // 2, y_offset))
             screen.blit(rendered, rendered_rect)
+            y_offset += 30
 
-    # --- Interfaz de usuario mejorada ---
+    # Mensaje final
+    final_msg = font_texto.render(
+        "Presiona ESC para salir", True, (255, 255, 255))
+    final_rect = final_msg.get_rect(
+        center=(screen.get_width() // 2, y_offset + 20))
+    screen.blit(final_msg, final_rect)
 
 
 def mostrar_hud_mejorado():
-    """Muestra la interfaz del juego."""
-    font = pygame.font.SysFont(None, 24)
+    """Muestra HUD con información de ambos jugadores."""
+    font = pygame.font.SysFont(None, 22)
     font_small = pygame.font.SysFont(None, 18)
 
-    # --- Información del clima ---
+    # Información del clima
     info_clima = sistema_clima.obtener_info_clima()
     clima_texto = sistema_clima.traducir_clima(info_clima['estado'])
     clima_color = (255, 255, 255)
@@ -189,61 +274,33 @@ def mostrar_hud_mejorado():
         clima_color = (255, 200, 100)
 
     screen.blit(font.render(
-        f"Clima: {clima_texto}", True,
-        clima_color), (10, 70))
-    screen.blit(font_small.render(
-        f"Intensidad: {info_clima['intensidad']:.1f}",
-        True, (200, 200, 200)), (10, 95))
+        f"Clima: {clima_texto}", True, clima_color), (10, 10))
 
-    # --- Meta de ingresos ---
-    progreso_meta = (jugador.puntaje / meta_ingresos) * 100
-    meta_texto = (f"Meta: ${jugador.puntaje}/${meta_ingresos}"
-                  f" ({progreso_meta:.1f}%)")
-    color_meta = (0, 255, 0) if progreso_meta >= 100 else (255, 255, 255)
-    screen.blit(font.render(meta_texto, True, color_meta), (10, 120))
-
-    # --- Inventario resumen ---
-    inventario_texto = \
-        (f"Inventario: {len(jugador.inventario)}/"
-         f"{jugador.capacidad} (Peso: {jugador.peso_total()})")
+    # Meta e información del humano
+    y_pos = 40
     screen.blit(font.render(
-        inventario_texto, True, (255, 255, 255)),
-        (10, 145))
-
-    # --- Estado del jugador ---
-    estado_resistencia = jugador.obtener_estado_resistencia()
-    color_estado = (255, 255, 255)
-    if estado_resistencia == "Exhausto":
-        color_estado = (255, 0, 0)
-    elif estado_resistencia == "Cansado":
-        color_estado = (255, 255, 0)
-
+        f"HUMANO - ${jugador.puntaje}/{meta_ingresos}",
+        True, (100, 255, 100)), (10, y_pos))
     screen.blit(font_small.render(
-        f"Estado: {estado_resistencia}", True, color_estado),
-        (10, 170))
+        f"Rep: {jugador.reputacion} | Entregas: {jugador.entregas_completadas}",
+        True, (180, 255, 180)), (10, y_pos + 20))
 
-    # --- Mostrar estadísticas ---
-    if mostrar_estadisticas:
-        estadisticas = jugador.obtener_estadisticas()
-        y = 200  # O la posición que prefieras
-        font_estad = pygame.font.SysFont(None, 22)
-        for clave, valor in estadisticas.items():
-            texto = (f"{clave.replace('_', ' ').capitalize()}:"
-                     f" {valor:.2f}") if isinstance(valor, float)\
-                else f"{clave.replace('_', ' ').capitalize()}: {valor}"
-            texto_render = font_estad.render(texto, True, (0, 0, 0))
-            screen.blit(texto_render, (10, y))
-            y += 25
-
-    # --- Mostrar inventario ---
+    # Información del CPU (si existe)
+    if jugador_cpu:
+        y_pos += 50
+        screen.blit(font.render(
+            f"CPU ({jugador_cpu.dificultad.upper()}) - ${jugador_cpu.puntaje}",
+            True, (255, 100, 100)), (10, y_pos))
+        screen.blit(font_small.render(
+            f"Rep: {jugador_cpu.reputacion} | Entregas: {jugador_cpu.entregas_completadas}",
+            True, (255, 180, 180)), (10, y_pos + 20))
 
 
 def mostrar_inventario_detallado_ui():
-    """Muestra el inventario del jugador."""
+    """Muestra inventario del jugador humano."""
     if not mostrar_inventario_detallado or not jugador.inventario:
         return
 
-    # Fondo semi-transparente
     overlay = pygame.Surface((400, 300))
     overlay.set_alpha(200)
     overlay.fill((0, 0, 0))
@@ -252,21 +309,17 @@ def mostrar_inventario_detallado_ui():
     font = pygame.font.SysFont(None, 20)
     font_titulo = pygame.font.SysFont(None, 24)
 
-    # Título
-    titulo = font_titulo.render("INVENTARIO DETALLADO", True, (255, 255, 255))
+    titulo = font_titulo.render("INVENTARIO", True, (255, 255, 255))
     screen.blit(titulo, (210, 110))
 
-    # Lista de pedidos
     inventario_ordenado = jugador.obtener_inventario_ordenado('prioridad')
     y_offset = 140
 
     for i, pedido in enumerate(inventario_ordenado[:8]):
-        # Mostrar máximo 8
-        color = (255, 100, 100) if (pedido.priority >=
-                                    1) else (255, 255, 255)
+        color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
+        texto = (f"{i + 1}. Peso:{pedido.weight} "
+                 f"Pago:${pedido.payout} Prio:{pedido.priority}")
 
-        texto = (f"{i + 1}. Peso:{pedido.weight}"
-                 f" Pago:${pedido.payout} Prio:{pedido.priority}")
         tiempo_transcurrido = time.time() - getattr(
             pedido, 'tiempo_recogido', time.time())
         if tiempo_transcurrido > 20:
@@ -275,24 +328,6 @@ def mostrar_inventario_detallado_ui():
 
         rendered = font.render(texto, True, color)
         screen.blit(rendered, (210, y_offset + i * 20))
-
-    # Lista de pedidos ordenados por $
-    if ordendar_inventario:
-        inventario_ordenado = jugador.obtener_inventario_por_plata()
-        y_offset = 140
-
-        for i, pedido in enumerate(inventario_ordenado[:8]):  # Mostrar máximo 8
-            color = (255, 100, 100) if pedido.priority >= 1 else (255, 255, 255)
-
-            texto = f"{i + 1}. Peso:{pedido.weight} Pago:${pedido.payout} Prio:{pedido.priority}"
-            tiempo_transcurrido = time.time() - getattr(pedido, 'tiempo_recogido', time.time())
-            if tiempo_transcurrido > 20:
-                texto += " [TARDE]"
-                color = (255, 200, 100)
-
-            rendered = font.render(texto, True, color)
-            screen.blit(rendered, (210, y_offset + i * 20))
-
 
 
 # --- Bucle principal ---
@@ -305,225 +340,193 @@ while running:
     sistema_clima.actualizar()
     jugador.recuperar()
 
-    # Guardar estado para deshacer (cada 2 segundos para no saturar memoria)
-    if int(tiempo_transcurrido) % 2 == 0 and tiempo_transcurrido > 1:
-        historial_movimientos.guardar_estado(jugador, pedidos_activos, ahora)
+    # Actualizar CPU
+    if jugador_cpu:
+        clima_mult = sistema_clima.obtener_multiplicador_actual()
+        consumo_clima = sistema_clima.obtener_consumo_resistencia_extra()
+        jugador_cpu.actualizar(
+            pedidos_activos, tiles, clima_mult, consumo_clima)
 
-    # Condiciones de finalización del juego
+    # Condiciones de finalización
     if not juego_terminado:
-        # Victoria por meta alcanzada
+        # Victoria por meta
         if jugador.puntaje >= meta_ingresos:
             juego_terminado = True
-            juego_ganado = True
+            ganador = 'humano'
             tiempo_final = tiempo_transcurrido
-
+        elif jugador_cpu and jugador_cpu.puntaje >= meta_ingresos:
+            juego_terminado = True
+            ganador = 'cpu'
+            tiempo_final = tiempo_transcurrido
         # Derrota por tiempo
         elif tiempo_transcurrido >= duracion:
             juego_terminado = True
-            juego_ganado = False
+            # Ganador por más dinero
+            if jugador_cpu:
+                ganador = 'humano' if jugador.puntaje > jugador_cpu.puntaje else 'cpu'
+            else:
+                ganador = 'humano'
             tiempo_final = duracion
-
         # Derrota por reputación
         elif jugador.reputacion <= 20:
             juego_terminado = True
-            juego_ganado = False
+            ganador = 'cpu' if jugador_cpu else None
+            tiempo_final = tiempo_transcurrido
+        elif jugador_cpu and jugador_cpu.reputacion <= 20:
+            juego_terminado = True
+            ganador = 'humano'
             tiempo_final = tiempo_transcurrido
 
-        # Si el juego acaba de terminar, calcular puntaje
-        if juego_terminado and puntaje_calculado is None:
-            puntaje_calculado = sistema_persistencia.calcular_puntaje_final(
-                jugador, tiempo_final, duracion, meta_ingresos
-            )
+        # Calcular puntajes finales
+        if juego_terminado and puntaje_calculado_humano is None:
+            puntaje_calculado_humano = sistema_persistencia.calcular_puntaje_final(
+                jugador, tiempo_final, duracion, meta_ingresos)
 
-            # Guardar puntaje
-            sistema_persistencia.guardar_puntaje(
-                "Jugador",
-                puntaje_calculado['puntaje_final'],
-                {
-                    'tiempo_total': tiempo_final,
-                    'entregas_completadas': jugador.entregas_completadas,
-                    'reputacion_final': jugador.reputacion,
-                    'dinero_ganado': jugador.puntaje,
-                    'meta_alcanzada': juego_ganado
-                }
-            )
+            if jugador_cpu:
+                puntaje_calculado_cpu = sistema_persistencia.calcular_puntaje_final(
+                    jugador_cpu, tiempo_final, duracion, meta_ingresos)
 
-    # Si el juego terminó, mostrar pantalla final
+    # Pantalla final
     if juego_terminado:
-        mostrar_pantalla_final(juego_ganado, puntaje_calculado)
+        mostrar_pantalla_final(
+            ganador, puntaje_calculado_humano, puntaje_calculado_cpu)
         pygame.display.flip()
 
-        # Esperar a que presione ESC para salir
         for event in pygame.event.get():
-            if (event.type == pygame.QUIT
-                    or (event.type == pygame.KEYDOWN
-                        and event.key == pygame.K_ESCAPE)):
+            if (event.type == pygame.QUIT or
+                    (event.type == pygame.KEYDOWN and
+                     event.key == pygame.K_ESCAPE)):
                 running = False
         continue
-    # --- Limpiar pedidos vistos periódicamente ---
-    if ahora - ultimo_limpieza_vistos >= intervalo_limpieza:
 
+    # Limpiar pedidos vistos
+    if ahora - ultimo_limpieza_vistos >= intervalo_limpieza:
         ids_activos = set()
         for ped in pedidos_activos:
             ids_activos.add(getattr(ped, 'id', None))
         for ped in jugador.inventario:
             ids_activos.add(getattr(ped, 'id', None))
+        if jugador_cpu:
+            for ped in jugador_cpu.inventario:
+                ids_activos.add(getattr(ped, 'id', None))
 
-        # Limpiar pedidos_vistos manteniendo solo los activos
         pedidos_vistos = ids_activos
         ultimo_limpieza_vistos = ahora
 
-    # --- Chequear nuevos pedidos (solo si juego activo) ---
+    # Chequear nuevos pedidos
     if ahora - ultimo_check >= check_interval:
         try:
             resp = api.obtener_pedidos()
-            nuevos_pedidos_data = resp.get("data", []) if isinstance(resp, dict) else resp
+            nuevos_pedidos_data = (resp.get("data", [])
+                                   if isinstance(resp, dict) else resp)
         except Exception as e:
-            print("Error al obtener pedidos de la API:", e)
+            print("Error al obtener pedidos:", e)
             nuevos_pedidos_data = []
 
         for p in nuevos_pedidos_data:
-            # Verificar duplicados usando el ID si existe
             pedido_id = p.get("id", f"{p['pickup']}-{p['dropoff']}")
 
             if pedido_id not in pedidos_vistos:
                 pedidos_vistos.add(pedido_id)
 
-                # Obtener casillas ocupadas
                 ocupadas = set()
-                for ped in pedidos_activos + list(jugador.inventario):
+                for ped in pedidos_activos:
                     ocupadas.add(tuple(ped.pickup))
                     ocupadas.add(tuple(ped.dropoff))
-                ocupadas.add((jugador.x, jugador.y))
+                for ped in list(jugador.inventario):
+                    ocupadas.add(tuple(ped.pickup))
+                    ocupadas.add(tuple(ped.dropoff))
+                if jugador_cpu:
+                    for ped in list(jugador_cpu.inventario):
+                        ocupadas.add(tuple(ped.pickup))
+                        ocupadas.add(tuple(ped.dropoff))
 
-                # Asignar posiciones aleatorias con separación
-                pickup_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=4)
+                ocupadas.add((jugador.x, jugador.y))
+                if jugador_cpu:
+                    ocupadas.add((jugador_cpu.x, jugador_cpu.y))
+
+                pickup_pos = asignar_posicion_aleatoria(
+                    tiles, ocupadas, separacion=4)
                 if pickup_pos:
                     p["pickup"] = pickup_pos
                     ocupadas.add(tuple(pickup_pos))
                 else:
-                    # Si no hay espacio con sep=4, intentar con sep=2
-                    pickup_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=2)
-                    if pickup_pos:
-                        p["pickup"] = pickup_pos
-                        ocupadas.add(tuple(pickup_pos))
-                    else:
-                        print(f"No se pudo asignar pickup para pedido {pedido_id}")
-                        continue
+                    continue
 
-                dropoff_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=4)
+                dropoff_pos = asignar_posicion_aleatoria(
+                    tiles, ocupadas, separacion=4)
                 if dropoff_pos:
                     p["dropoff"] = dropoff_pos
-                    ocupadas.add(tuple(dropoff_pos))
                 else:
-                    # Si no hay espacio con sep=4, intentar con sep=2
-                    dropoff_pos = asignar_posicion_aleatoria(tiles, ocupadas, separacion=2)
-                    if dropoff_pos:
-                        p["dropoff"] = dropoff_pos
-                        ocupadas.add(tuple(dropoff_pos))
-                    else:
-                        print(f"No se pudo asignar dropoff para pedido {pedido_id}")
-                        continue
+                    continue
 
                 nuevo_pedido = Pedido(
                     p["pickup"], p["dropoff"],
                     p.get("weight", 1),
                     p.get("priority", 0),
-                    p.get("payout", 100)
-                )
-
-                # Guardar el ID
+                    p.get("payout", 100))
                 nuevo_pedido.id = pedido_id
 
                 cola_pedidos.agregar_pedido(nuevo_pedido)
 
-
         ultimo_check = ahora
 
-    # --- Liberar pedidos ---
+    # Liberar pedidos
     if len(pedidos_activos) < 5 and ahora - ultimo_liberado >= liberar_interval:
         pedido = cola_pedidos.obtener_siguiente()
         if pedido:
             pedidos_activos.append(pedido)
             ultimo_liberado = ahora
 
-    # --- Eventos ---
+    # Eventos del jugador humano
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
             dx = dy = 0
 
-            # Movimiento
             if event.key == pygame.K_LEFT:
                 dx = -1
-                if direccion_der:
-                    direccion_der = False
+                direccion_der = False
             elif event.key == pygame.K_RIGHT:
                 dx = 1
-                if not direccion_der:
-                    direccion_der = True
+                direccion_der = True
             elif event.key == pygame.K_UP:
                 dy = -1
             elif event.key == pygame.K_DOWN:
                 dy = 1
-
-            # Acciones especiales
             elif event.key == pygame.K_q:
                 jugador.cancelar_ultimo_pedido()
-            elif event.key == pygame.K_u:  # Deshacer
-                historial_movimientos.deshacer(jugador, pedidos_activos)
-            elif (event.key == pygame.K_s and
-                  pygame.key.get_pressed()[pygame.K_LCTRL]):
-                # Ctrl+S Guardar
-                estado_actual = {
-                    'jugador': jugador,
-                    'pedidos_activos': pedidos_activos,
-                    'cola_pedidos': cola_pedidos,
-                    'clima': sistema_clima,
-                    'tiempo_inicio': tiempo_inicio,
-                    'tiempo_transcurrido': tiempo_transcurrido,
-                    'mapa': tiles
-                }
-                sistema_persistencia.guardar_juego(estado_actual)
             elif event.key == pygame.K_i:
-                # Mostrar/ocultar inventario detallado
                 mostrar_inventario_detallado = not mostrar_inventario_detallado
-            elif event.key == pygame.K_t:  # Mostrar/ocultar estadísticas
+            elif event.key == pygame.K_t:
                 mostrar_estadisticas = not mostrar_estadisticas
-            elif event.key == pygame.K_o:  # Ordenar pedidos por plata
-                ordendar_inventario = not ordendar_inventario
 
-            # Realizar movimiento con clima
             if dx != 0 or dy != 0:
                 clima_mult = sistema_clima.obtener_multiplicador_actual()
-                consumo_clima = (sistema_clima.
-                                 obtener_consumo_resistencia_extra())
+                consumo_clima = sistema_clima.obtener_consumo_resistencia_extra()
                 jugador.mover(dx, dy, tiles, clima_mult, consumo_clima)
 
-    # --- Revisar pickups ---
+    # Recoger pedidos (humano)
     for pedido in list(pedidos_activos):
         if [jugador.x, jugador.y] == pedido.pickup:
             if jugador.recoger_pedido(pedido):
                 pedidos_activos.remove(pedido)
 
-    # --- Revisar dropoffs ---
-    entregado = jugador.entregar_pedido()
-    if entregado:
-        print(f"Pedido entregado - Puntaje: {jugador.puntaje},"
-              f" Reputación: {jugador.reputacion}")
+    # Entregar pedidos (humano)
+    jugador.entregar_pedido()
 
-    # --- Renderizado ---
-    # Cámara
-    cam_x = max(0, min(jugador.x - view_width // 2, map_width - view_width))
-    cam_y = max(0, min(jugador.y - view_height // 2, map_height - view_height))
+    # Renderizado
+    cam_x = max(0, min(jugador.x - view_width // 2,
+                       map_width - view_width))
+    cam_y = max(0, min(jugador.y - view_height // 2,
+                       map_height - view_height))
 
-    # Dibujar mapa y objetos
     screen.fill((255, 255, 255))
-    dibujar_mapa(screen, tiles, colors, cam_x, cam_y, tile_size,
-                 view_width, view_height, imagenes_tiles)
+    dibujar_mapa(screen, tiles, colors, cam_x, cam_y,
+                 tile_size, view_width, view_height, imagenes_tiles)
 
-    # Pedidos activos (pickups)
+    # Pedidos activos
     for pedido in pedidos_activos:
         px, py = pedido.pickup
         if (cam_x <= px < cam_x + view_width and
@@ -531,136 +534,89 @@ while running:
             screen.blit(pickup_image,
                         ((px - cam_x) * tile_size,
                          (py - cam_y) * tile_size))
-            # Agrega imagen
 
-        # --- Leyenda de prioridades arriba a la izquierda ---
-        leyenda_size = 26
-        dropoff_prioridad_img_scaled =\
-            pygame.transform.scale(dropoff_prioridad_image,
-                                   (leyenda_size, leyenda_size))
-        dropoff_normal_img_scaled =\
-            pygame.transform.scale(dropoff_normal_image,
-                                   (leyenda_size, leyenda_size))
-
-        font = pygame.font.SysFont(None, 26)
-        if dropoff_prioridad_img_scaled:
-            screen.blit(dropoff_prioridad_img_scaled, (5, 5))
-        else:
-            pygame.draw.rect(screen, (255, 0, 0), (10, 10, 20, 20))
-            # Fallback
-        screen.blit(font.render("Prioridad máxima",
-                                True, (255, 255, 255)), (35, 10))
-
-        if dropoff_normal_img_scaled:
-            screen.blit(dropoff_normal_img_scaled, (5, 30))
-        else:
-            pygame.draw.rect(screen, (255, 105, 180), (10, 40, 20, 20))
-            # Fallback
-        screen.blit(font.render("Prioridad normal", True,
-                                (255, 255, 255)), (35, 40))
-
-    # Dropoffs del inventario
-    for pedido in jugador.inventario:
+    # Dropoffs (ambos jugadores)
+    for pedido in list(jugador.inventario) + (list(jugador_cpu.inventario)
+                                               if jugador_cpu else []):
         dx, dy = pedido.dropoff
         if (cam_x <= dx < cam_x + view_width and
                 cam_y <= dy < cam_y + view_height):
-            if pedido.priority >= 1:  # Si es prioridad maxima
-                imagen_dropoff = dropoff_prioridad_image
-            else:
-                imagen_dropoff = dropoff_normal_image
+            imagen = (dropoff_prioridad_image if pedido.priority >= 1
+                      else dropoff_normal_image)
+            screen.blit(imagen,
+                        ((dx - cam_x) * tile_size,
+                         (dy - cam_y) * tile_size))
 
-            screen.blit(
-                imagen_dropoff, ((dx - cam_x) *
-                                 tile_size, (dy - cam_y) * tile_size))
+    # CPU
+    if jugador_cpu:
+        cpu_x_screen = jugador_cpu.x
+        cpu_y_screen = jugador_cpu.y
+        if (cam_x <= cpu_x_screen < cam_x + view_width and
+                cam_y <= cpu_y_screen < cam_y + view_height):
+            screen.blit(cpu_image_colored,
+                        ((cpu_x_screen - cam_x) * tile_size,
+                         (cpu_y_screen - cam_y) * tile_size))
 
-    # Jugador
-    # ---Cambia la direccion del jugador ---
+    # Jugador humano
     if direccion_der:
-        screen.blit(
-            player_image, ((jugador.x - cam_x) *
-                           tile_size, (jugador.y - cam_y) * tile_size))
+        screen.blit(player_image,
+                    ((jugador.x - cam_x) * tile_size,
+                     (jugador.y - cam_y) * tile_size))
     else:
-        screen.blit(
-            player_imagen_flip, ((jugador.x - cam_x) *
-                                 tile_size, (jugador.y - cam_y) * tile_size))
+        screen.blit(player_imagen_flip,
+                    ((jugador.x - cam_x) * tile_size,
+                     (jugador.y - cam_y) * tile_size))
 
     # UI
     mostrar_hud_mejorado()
 
-    # Barra de resistencia
-    font = pygame.font.SysFont(None, 24)
-    ancho_barra = 200
-    alto_barra = 20
+    # Barra de resistencia (humano)
+    font = pygame.font.SysFont(None, 20)
+    ancho_barra = 150
+    alto_barra = 15
     x_barra = 10
     y_barra = screen.get_height() - 80
 
     porcentaje = max(0, jugador.resistencia / jugador.max_resistencia)
     ancho_actual = int(ancho_barra * porcentaje)
-    color_barra = (0, 255, 0) \
-        if porcentaje > 0.3 else (255, 255, 0) \
-        if porcentaje > 0.1 else (255, 0, 0)
+    color_barra = ((0, 255, 0) if porcentaje > 0.3
+                   else (255, 255, 0) if porcentaje > 0.1
+                   else (255, 0, 0))
 
     pygame.draw.rect(screen, (100, 100, 100),
                      (x_barra, y_barra, ancho_barra, alto_barra))
     pygame.draw.rect(screen, color_barra,
                      (x_barra, y_barra, ancho_actual, alto_barra))
-    screen.blit(font.render(
-        "Resistencia", True, (0, 0, 0)),
-        (x_barra, y_barra - 20))
+    screen.blit(font.render("Resistencia (H)", True, (0, 0, 0)),
+                (x_barra, y_barra - 18))
 
-    # Barra de reputación
-    y_barra_rep = screen.get_height() - 30
-    porcentaje_rep = max(0, jugador.reputacion / 100)
-    ancho_actual_rep = int(ancho_barra * porcentaje_rep)
-    color_barra_rep = (255, 0, 0)\
-        if jugador.reputacion <= 30 else (255, 255, 0)\
-        if jugador.reputacion <= 60 else (0, 0, 255)
+    # Barra de resistencia (CPU)
+    if jugador_cpu:
+        y_barra_cpu = y_barra + 25
+        porcentaje_cpu = max(0, jugador_cpu.resistencia /
+                             jugador_cpu.max_resistencia)
+        ancho_actual_cpu = int(ancho_barra * porcentaje_cpu)
+        color_barra_cpu = ((255, 100, 100) if porcentaje_cpu > 0.3
+                           else (255, 200, 100) if porcentaje_cpu > 0.1
+                           else (255, 0, 0))
 
-    pygame.draw.rect(screen, (100, 100, 100),
-                     (x_barra, y_barra_rep, ancho_barra, alto_barra))
-    pygame.draw.rect(screen, color_barra_rep,
-                     (x_barra, y_barra_rep, ancho_actual_rep, alto_barra))
-    screen.blit(font.render("Reputación", True,
-                            (0, 0, 0)), (x_barra, y_barra_rep - 20))
+        pygame.draw.rect(screen, (100, 100, 100),
+                         (x_barra, y_barra_cpu, ancho_barra, alto_barra))
+        pygame.draw.rect(screen, color_barra_cpu,
+                         (x_barra, y_barra_cpu, ancho_actual_cpu, alto_barra))
+        screen.blit(font.render("Resistencia (CPU)", True, (0, 0, 0)),
+                    (x_barra, y_barra_cpu - 18))
 
     # Cronómetro
     tiempo_restante = max(0, int(duracion - tiempo_transcurrido))
     minutos = tiempo_restante // 60
     segundos = tiempo_restante % 60
-    cronometro_texto = f"Tiempo: {minutos:02d}:{segundos:02d}"
+    cronometro_texto = f"{minutos:02d}:{segundos:02d}"
     font_crono = pygame.font.SysFont(None, 36)
     color_tiempo = (255, 0, 0) if tiempo_restante < 60 else (0, 0, 0)
     screen.blit(font_crono.render(cronometro_texto, True, color_tiempo),
-                (screen.get_width() - 180, 10))
+                (screen.get_width() - 120, 10))
 
-    # Mostrar mensajes temporales
-    if jugador.mensaje and time.time() - jugador.mensaje_tiempo < 3:
-        font_msg = pygame.font.SysFont(None, 28)
-        aviso = font_msg.render(
-            jugador.mensaje, True, (0, 0, 0))
-        screen.blit(aviso, (10, screen.get_height() - 130))
-
-    # Mensaje de energía
-    if jugador.bloqueado:
-        font_msg = pygame.font.SysFont(None, 36)
-        aviso = font_msg.render(
-            "¡Sin energía! Descansando...", True, (255, 0, 0))
-        screen.blit(aviso, (10, screen.get_height() - 110))
-
-    # --- Controles ---
-    font_controles = pygame.font.SysFont(None, 20)
-    controles_texto = [
-        '"Q" cancelar pedido  "U" deshacer  "I" inventario',
-        '"Ctrl+S" guardar  "T" estadísticas "I+O" orden por $'
-    ]
-    for i, texto in enumerate(controles_texto):
-        rendered = font_controles.render(texto, True, (0, 0, 0))
-        rect = rendered.get_rect()
-        rect.bottomright = (screen.get_width() -
-                            10, screen.get_height() - 30 + i * 20)
-        screen.blit(rendered, rect)
-
-    # Overlays opcionales
     mostrar_inventario_detallado_ui()
 
     pygame.display.flip()
